@@ -1,0 +1,16 @@
+.login-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem 1rem;
+  background: radial-gradient(circle at top, #ffffff 0%, #f7fbff 45%, #eff5fc 100%);
+  box-sizing: border-box;
+}
+
+.auth-loading {
+  margin: 0;
+  font-size: 1rem;
+  color: #475569;
+  text-align: center;
+}

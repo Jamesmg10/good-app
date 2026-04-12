@@ -1,0 +1,125 @@
+.login-panel {
+  width: min(100%, 420px);
+  background: linear-gradient(160deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid #dbe7f5;
+  border-radius: 16px;
+  padding: 2rem 1.75rem;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.1);
+}
+
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.login-brand__mark {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+}
+
+.login-brand__name {
+  font-weight: 800;
+  font-size: 1.2rem;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.login-brand__tagline {
+  font-size: 0.85rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.login-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.45rem;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.login-subtitle {
+  margin: 0 0 1.5rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #475569;
+}
+
+.login-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #fff;
+  border-color: #1d4ed8;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.25);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.03);
+}
+
+.btn-social {
+  background: #ffffff;
+  color: #1e293b;
+  border-color: #dbe7f5;
+}
+
+.btn-social:hover {
+  background: #f8fbff;
+  border-color: #bfdbfe;
+}
+
+.btn-google {
+  border-color: #e2e8f0;
+}
+
+.btn-apple {
+  border-color: #e2e8f0;
+}
+
+.btn-facebook {
+  border-color: #e2e8f0;
+}
+
+.login-footnote {
+  margin: 1.35rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #94a3b8;
+}
+
+.auth-loading {
+  margin: 0;
+  font-size: 1rem;
+  color: #475569;
+  text-align: center;
+}

@@ -1,0 +1,98 @@
+@page "/"
+@page "/login"
+@layout LoginLayout
+@attribute [AllowAnonymous]
+
+<PageTitle>Good — Sign in</PageTitle>
+
+<section class="login-panel" aria-labelledby="login-heading">
+    <div class="login-brand">
+        <span class="login-brand__mark" aria-hidden="true">G</span>
+        <div>
+            <div class="login-brand__name">Good</div>
+            <div class="login-brand__tagline">Give with confidence</div>
+        </div>
+    </div>
+
+    <h1 id="login-heading" class="login-title">Sign in to continue</h1>
+    <p class="login-subtitle">
+        Use your account to access the map and your giving activity. Social sign-in is enabled in Microsoft Entra External ID (configure providers in Azure).
+    </p>
+
+    <div class="login-actions">
+        <button type="button" class="btn btn-primary" @onclick="SignInWithMicrosoftAsync">
+            Continue with Microsoft
+        </button>
+        <button type="button" class="btn btn-social btn-google" @onclick="SignInWithGoogleAsync">
+            Continue with Google
+        </button>
+        <button type="button" class="btn btn-social btn-apple" @onclick="SignInWithAppleAsync">
+            Continue with Apple
+        </button>
+        <button type="button" class="btn btn-social btn-facebook" @onclick="SignInWithFacebookAsync">
+            Continue with Facebook
+        </button>
+    </div>
+
+    <p class="login-footnote">
+        By continuing you agree to our terms and privacy policy (placeholder). Funds flow to verified nonprofits; configure your Entra tenant for production identity.
+    </p>
+</section>
+
+@code {
+    private const string PostLoginReturnPath = "/map";
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    [Inject]
+    private NavigationManager Navigation { get; set; } = default!;
+
+    [Inject]
+    private IConfiguration Configuration { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthenticationStateTask is null)
+            return;
+
+        var state = await AuthenticationStateTask;
+        if (state.User.Identity?.IsAuthenticated == true)
+            Navigation.NavigateTo(PostLoginReturnPath);
+    }
+
+    private Task SignInWithMicrosoftAsync() =>
+        StartSignInAsync("Microsoft");
+
+    private Task SignInWithGoogleAsync() =>
+        StartSignInAsync("Google");
+
+    private Task SignInWithAppleAsync() =>
+        StartSignInAsync("Apple");
+
+    private Task SignInWithFacebookAsync() =>
+        StartSignInAsync("Facebook");
+
+    private Task StartSignInAsync(string providerKey)
+    {
+        var options = new InteractiveRequestOptions
+        {
+            Interaction = InteractionType.SignIn,
+            ReturnUrl = PostLoginReturnPath,
+        };
+
+        var section = Configuration.GetSection($"AzureAd:LoginQuery:{providerKey}");
+        if (section.Exists())
+        {
+            foreach (var child in section.GetChildren())
+            {
+                var value = child.Value;
+                if (!string.IsNullOrEmpty(value))
+                    options.TryAddAdditionalParameter(child.Key, value);
+            }
+        }
+
+        Navigation.NavigateToLogin("authentication/login", options);
+        return Task.CompletedTask;
+    }
+}

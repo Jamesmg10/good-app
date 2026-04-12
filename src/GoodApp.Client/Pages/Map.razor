@@ -1,0 +1,106 @@
+@page "/map"
+
+<PageTitle>Good — Map</PageTitle>
+
+<h1>Charitable opportunities near you</h1>
+<p class="map-intro">Pins show volunteer, donation, and event locations from the API. Click a pin for details.</p>
+
+<div class="map-legend" aria-label="Marker legend">
+    <span class="map-legend__title">Legend</span>
+    <span class="map-legend__item"><span class="map-legend__swatch map-legend__swatch--volunteer">V</span> Volunteer</span>
+    <span class="map-legend__item"><span class="map-legend__swatch map-legend__swatch--donation">D</span> Donation</span>
+    <span class="map-legend__item"><span class="map-legend__swatch map-legend__swatch--event">E</span> Event</span>
+</div>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert" role="alert">@_error</div>
+}
+
+<div id="good-map" class="good-map @( _loading ? "loading" : "" )"></div>
+
+@if (_loading)
+{
+    <p class="loading-text">Loading map…</p>
+}
+
+@code {
+    private const string MapContainerId = "good-map";
+    private const string PlaceholderMapsKey = "YOUR_AZURE_MAPS_PRIMARY_KEY";
+
+    private static bool IsPlaceholderMapsKey(string key) =>
+        string.Equals(key.Trim(), PlaceholderMapsKey, StringComparison.OrdinalIgnoreCase);
+
+    [Inject]
+    private HttpClient Http { get; set; } = default!;
+
+    [Inject]
+    private IJSRuntime Js { get; set; } = default!;
+
+    [Inject]
+    private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager Navigation { get; set; } = default!;
+
+    private IJSObjectReference? _mapModule;
+    private string? _error;
+    private bool _loading = true;
+    private bool _isAuthenticated;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _isAuthenticated = state.User.Identity?.IsAuthenticated == true;
+        if (!_isAuthenticated)
+            Navigation.NavigateTo("/login");
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || !_isAuthenticated)
+            return;
+
+        try
+        {
+            var auth = await Http.GetFromJsonAsync<MapAuthResponse>("api/maps/auth");
+            if (auth is null || !string.IsNullOrEmpty(auth.Error) || string.IsNullOrEmpty(auth.SubscriptionKey))
+            {
+                _error = auth?.Error ?? "Could not load map authentication. Set AzureMaps:SubscriptionKey on the API (see README).";
+                _loading = false;
+                StateHasChanged();
+                return;
+            }
+
+            if (IsPlaceholderMapsKey(auth.SubscriptionKey))
+            {
+                _error = "Azure Maps key is still the placeholder. In src/GoodApp.Api run: dotnet user-secrets set \"AzureMaps:SubscriptionKey\" \"<your real Primary Key from Azure Portal>\"";
+                _loading = false;
+                StateHasChanged();
+                return;
+            }
+
+            _mapModule = await Js.InvokeAsync<IJSObjectReference>("import", "./js/azureMaps.js");
+            await _mapModule.InvokeVoidAsync("initMap", MapContainerId, auth.SubscriptionKey);
+
+            var opportunities = await Http.GetFromJsonAsync<List<OpportunityDto>>("api/opportunities") ?? [];
+            var json = System.Text.Json.JsonSerializer.Serialize(
+                opportunities,
+                new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+            await _mapModule.InvokeVoidAsync("loadOpportunities", json);
+        }
+        catch (HttpRequestException ex)
+        {
+            _error = $"Cannot reach the API ({Http.BaseAddress}). Start the API: cd src/GoodApp.Api && dotnet run — {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+}

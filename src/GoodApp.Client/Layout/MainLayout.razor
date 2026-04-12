@@ -1,0 +1,22 @@
+@inherits LayoutComponentBase
+
+<div class="page">
+    <header class="top-bar">
+        <a class="brand" href="/map">Good</a>
+        <nav>
+            <AuthorizeView>
+                <Authorized>
+                    <NavLink href="/map" Match="NavLinkMatch.All">Map</NavLink>
+                    <a class="nav-link-out" href="/authentication/logout">Log out</a>
+                </Authorized>
+                <NotAuthorized>
+                    <NavLink href="/">Sign in</NavLink>
+                </NotAuthorized>
+            </AuthorizeView>
+        </nav>
+    </header>
+
+    <main class="content">
+        @Body
+    </main>
+</div>

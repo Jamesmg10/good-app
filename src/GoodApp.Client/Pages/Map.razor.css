@@ -1,0 +1,88 @@
+.map-intro {
+  color: #475569;
+  margin: 0 0 0.75rem;
+  max-width: 40rem;
+}
+
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.9rem;
+  background: #ffffff;
+  border: 1px solid #dbe7f5;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  color: #334155;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+}
+
+.map-legend__title {
+  font-weight: 700;
+  color: #0f172a;
+  margin-right: 0.25rem;
+}
+
+.map-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.map-legend__swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 5px rgba(15, 23, 42, 0.2);
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.map-legend__swatch--volunteer {
+  background: #0e7490;
+}
+
+.map-legend__swatch--donation {
+  background: #2563eb;
+}
+
+.map-legend__swatch--event {
+  background: #4338ca;
+}
+
+.good-map {
+  width: 100%;
+  height: min(70vh, 560px);
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid #cfe0f6;
+  background: #e7eff9;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.14);
+}
+
+.good-map.loading {
+  opacity: 0.85;
+}
+
+.loading-text {
+  margin-top: 0.5rem;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.alert {
+  background: #eaf2ff;
+  color: #1e3a8a;
+  border: 1px solid #bfdbfe;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  margin-bottom: 1rem;
+  max-width: 48rem;
+}
