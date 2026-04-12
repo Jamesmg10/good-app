@@ -9,6 +9,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="8.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GoodApp.Client\GoodApp.Client.csproj" />
     <ProjectReference Include="..\GoodApp.Shared\GoodApp.Shared.csproj" />
   </ItemGroup>
 

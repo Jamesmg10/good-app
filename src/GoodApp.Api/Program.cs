@@ -18,6 +18,10 @@ var app = builder.Build();
 
 app.UseCors();
 
+// Hosted Blazor WebAssembly: serve the client and NuGet static assets (_framework, _content/...).
+app.UseBlazorFrameworkFiles();
+app.UseStaticFiles();
+
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok", app = "Good" }));
 
 app.MapGet("/api/maps/auth", (IConfiguration config) =>
@@ -48,5 +52,7 @@ app.MapGet("/api/opportunities", (OpportunityStore store, double? minLat, double
 
     return Results.Json(list.ToList());
 });
+
+app.MapFallbackToFile("index.html");
 
 app.Run();

@@ -15,11 +15,7 @@ builder.Services.AddAuthorizationCore();
 builder.Services.AddMsalAuthentication(options =>
 {
     builder.Configuration.Bind("AzureAd", options.ProviderOptions.Authentication);
-    // Popup mode often hangs at "Checking login state" locally (blockers, storage). Redirect is reliable for SPA.
     options.ProviderOptions.LoginMode = "redirect";
-    // Persist auth across full-page redirects; cookie flag helps some browsers (Safari / strict storage).
-    options.ProviderOptions.Cache.CacheLocation = "localStorage";
-    options.ProviderOptions.Cache.StoreAuthStateInCookie = true;
     options.ProviderOptions.DefaultAccessTokenScopes.Add("openid");
     options.ProviderOptions.DefaultAccessTokenScopes.Add("profile");
 });
