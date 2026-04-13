@@ -1,12 +1,16 @@
 .page {
+  height: 100vh;
   min-height: 100vh;
+  max-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: radial-gradient(circle at top, #ffffff 0%, #f7fbff 45%, #eff5fc 100%);
   color: #1f2937;
 }
 
 .top-bar {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -14,9 +18,8 @@
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(6px);
   border-bottom: 1px solid #dbe7f5;
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  position: relative;
+  z-index: 30;
 }
 
 .brand {
@@ -61,9 +64,20 @@
 
 .content {
   flex: 1;
+  min-height: 0;
   padding: 1.2rem 1.25rem 2rem;
   max-width: 1200px;
   width: 100%;
   margin: 0 auto;
   box-sizing: border-box;
+  overflow: auto;
+}
+
+.content--flush {
+  padding: 0;
+  max-width: none;
+  margin: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }

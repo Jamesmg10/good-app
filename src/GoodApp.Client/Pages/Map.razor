@@ -2,27 +2,68 @@
 
 <PageTitle>Good — Map</PageTitle>
 
-<h1>Charitable opportunities near you</h1>
-<p class="map-intro">Pins show volunteer, donation, and event locations from the API. Click a pin for details.</p>
+<h1 class="map-page-title">Charitable opportunities near you</h1>
 
-<div class="map-legend" aria-label="Marker legend">
-    <span class="map-legend__title">Legend</span>
-    <span class="map-legend__item"><span class="map-legend__swatch map-legend__swatch--volunteer">V</span> Volunteer</span>
-    <span class="map-legend__item"><span class="map-legend__swatch map-legend__swatch--donation">D</span> Donation</span>
-    <span class="map-legend__item"><span class="map-legend__swatch map-legend__swatch--event">E</span> Event</span>
+<div class="map-page">
+    <div class="map-body">
+        <div class="map-drawer-stack @(_drawerOpen ? "map-drawer-stack--open" : null)">
+            <button type="button"
+                    class="map-drawer-pin"
+                    aria-expanded="@_drawerOpen"
+                    aria-controls="map-giving-drawer"
+                    title="@(_drawerOpen ? "Collapse giving menu" : "Open giving menu")"
+                    @onclick="ToggleDrawerAsync">
+                <span class="map-drawer-pin__icon" aria-hidden="true">@(_drawerOpen ? "⟨" : "⟩")</span>
+                <span class="map-drawer-pin__label">My giving</span>
+            </button>
+            <aside id="map-giving-drawer" class="map-drawer-panel" aria-hidden="@(!_drawerOpen)">
+                <div class="map-drawer-panel__inner">
+                    <h2 class="map-drawer-panel__heading">Giving</h2>
+                    <p class="map-drawer-panel__lede">Pins on the map are volunteer, donation, and event opportunities from the API.</p>
+
+                    <details class="map-blade" open>
+                        <summary class="map-blade__summary">My contributions</summary>
+                        <div class="map-blade__body">
+                            <p class="map-blade__muted">Linked donations and volunteer hours will show here when backend giving data is connected.</p>
+                            <ul class="map-blade__list">
+                                <li><span class="map-blade__stat">—</span> lifetime given (placeholder)</li>
+                                <li><span class="map-blade__stat">—</span> hours volunteered (placeholder)</li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <details class="map-blade">
+                        <summary class="map-blade__summary">Saved opportunities</summary>
+                        <div class="map-blade__body">
+                            <p class="map-blade__muted">Save pins to revisit later—coming soon.</p>
+                        </div>
+                    </details>
+                </div>
+            </aside>
+        </div>
+
+        <div class="map-canvas-wrap">
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="map-overlay-alert alert" role="alert">@_error</div>
+            }
+
+            <div class="map-legend map-legend--floating" aria-label="Marker legend">
+                <span class="map-legend__title">Legend</span>
+                <span class="map-legend__item"><span class="map-legend__swatch map-legend__swatch--volunteer">V</span> Volunteer</span>
+                <span class="map-legend__item"><span class="map-legend__swatch map-legend__swatch--donation">D</span> Donation</span>
+                <span class="map-legend__item"><span class="map-legend__swatch map-legend__swatch--event">E</span> Event</span>
+            </div>
+
+            <div id="good-map" class="good-map @(_loading ? "loading" : "")"></div>
+
+            @if (_loading && string.IsNullOrEmpty(_error))
+            {
+                <p class="map-loading-label">Loading map…</p>
+            }
+        </div>
+    </div>
 </div>
-
-@if (!string.IsNullOrEmpty(_error))
-{
-    <div class="alert" role="alert">@_error</div>
-}
-
-<div id="good-map" class="good-map @( _loading ? "loading" : "" )"></div>
-
-@if (_loading)
-{
-    <p class="loading-text">Loading map…</p>
-}
 
 @code {
     private const string MapContainerId = "good-map";
@@ -47,6 +88,7 @@
     private string? _error;
     private bool _loading = true;
     private bool _isAuthenticated;
+    private bool _drawerOpen = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -54,6 +96,28 @@
         _isAuthenticated = state.User.Identity?.IsAuthenticated == true;
         if (!_isAuthenticated)
             Navigation.NavigateTo("/login");
+    }
+
+    private async Task ToggleDrawerAsync()
+    {
+        _drawerOpen = !_drawerOpen;
+        StateHasChanged();
+        await Task.Delay(320);
+        await TryResizeMapAsync();
+    }
+
+    private async Task TryResizeMapAsync()
+    {
+        if (_mapModule is null)
+            return;
+        try
+        {
+            await _mapModule.InvokeVoidAsync("resizeMap");
+        }
+        catch
+        {
+            /* map may not be ready */
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -88,6 +152,7 @@
                 opportunities,
                 new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
             await _mapModule.InvokeVoidAsync("loadOpportunities", json);
+            await TryResizeMapAsync();
         }
         catch (HttpRequestException ex)
         {

@@ -127,8 +127,28 @@ export function initMap(containerId, subscriptionKey) {
         }, 120);
       });
 
+      const onWinResize = () => {
+        try {
+          map.resize();
+        } catch {
+          /* ignore */
+        }
+      };
+      window.addEventListener("resize", onWinResize);
+
       resolve();
     });
+  });
+}
+
+export function resizeMap() {
+  if (!map) return;
+  requestAnimationFrame(() => {
+    try {
+      map.resize();
+    } catch {
+      /* ignore */
+    }
   });
 }
 
