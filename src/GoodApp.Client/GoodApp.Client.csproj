@@ -18,10 +18,4 @@
     <ProjectReference Include="..\GoodApp.Shared\GoodApp.Shared.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Content Update="appsettings.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-
 </Project>

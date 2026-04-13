@@ -33,9 +33,11 @@ Alternatively, set the key in `appsettings.Development.json` locally (do not com
 
 ### 2. Configure Entra ID for the Blazor SPA
 
+**Where to put client settings (important):** Blazor WebAssembly loads configuration by requesting **`/appsettings.json`** from the **same origin** as the app (static files under `wwwroot`). The file **must** live at **`src/GoodApp.Client/wwwroot/appsettings.json`**. If `appsettings.json` sits only next to the `.csproj` or under `bin/`, the browser never receives `AzureAd` settings. MSAL.js then runs with no **`authority`**; its initializer calls `new URL(authority)` and the console shows **`Failed to construct 'URL': Invalid URL`**. That failure is **not** an Azure app registration or subscription problem—it is missing client config on the static site.
+
 In [Microsoft Entra admin center](https://entra.microsoft.com) (or Azure Portal), open your **App registration** and set:
 
-- **Application (client) ID** and **Directory (tenant) ID** → copy into `src/GoodApp.Client/appsettings.json` as `AzureAd:ClientId` and into `AzureAd:Authority` as `https://login.microsoftonline.com/{tenant-id}` (no `/v2.0` suffix).
+- **Application (client) ID** and **Directory (tenant) ID** → copy into `src/GoodApp.Client/wwwroot/appsettings.json` as `AzureAd:ClientId` and into `AzureAd:Authority` as `https://login.microsoftonline.com/{tenant-id}` (no `/v2.0` suffix).
 
 Under **Authentication**, add a **Single-page application** platform (not “Web”) and register this **exact** redirect URI for local dev:
 
@@ -45,7 +47,9 @@ Optional logout redirect:
 
 `https://localhost:7077/authentication/logout-callback`
 
-`appsettings.json` uses path-style values (`/authentication/login-callback`); MSAL combines them with the site origin. The origin must match how you open the app (**HTTPS** on **7077** when using the steps below).
+Use the same scheme, host, and port in **`RedirectUri`** / **`PostLogoutRedirectUri`** in `wwwroot/appsettings.json` as in Entra (for local dev, full `https://localhost:7077/...` URLs match the SPA registration above). The origin must match how you open the app (**HTTPS** on **7077** when using the steps below).
+
+To confirm the file is served, open **`https://localhost:7077/appsettings.json`** after starting the API; you should see JSON (without committing secrets you care about).
 
 ### 3. Start the host
 
@@ -80,7 +84,7 @@ kill <PID>
 
 ### 5. API base URL
 
-`src/GoodApp.Client/appsettings.json` sets `ApiBaseUrl` to `https://localhost:7077/` so `HttpClient` calls the same host that serves the UI. Change it if you use a different port.
+`src/GoodApp.Client/wwwroot/appsettings.json` sets `ApiBaseUrl` to `https://localhost:7077/` so `HttpClient` calls the same host that serves the UI. Change it if you use a different port.
 
 ---
 
@@ -121,12 +125,13 @@ This section records issues seen during development so future debugging starts f
 | Symptom | Likely cause | Notes |
 |--------|----------------|-------|
 | `Could not find 'AuthenticationService.init' ('AuthenticationService' was undefined)` | The MSAL JavaScript file never ran, so `window.AuthenticationService` was missing. | Often happened when running **`dotnet run` on `GoodApp.Client` only**: the WASM **dev server** frequently does **not** serve `_content/Microsoft.Authentication.WebAssembly.Msal/AuthenticationService.js` correctly. **Fix:** host the client from **`GoodApp.Api`** (`UseBlazorFrameworkFiles`, `UseStaticFiles`, `MapFallbackToFile`) so behavior matches [hosted Blazor WebAssembly](https://learn.microsoft.com/aspnet/core/blazor/host-and-deploy/webassembly-hosted). Also ensure `index.html` contains the `<script src="_content/.../AuthenticationService.js">` tag (as in the official templates). |
+| `Failed to construct 'URL': Invalid URL` (console, `AuthenticationService.js` / MSAL `init`) | **`AzureAd:Authority` never reached the WASM app.** Blazor loads settings from **`/appsettings.json`** (a static file under **`wwwroot`**). If that file is missing from the served site, `authority` is empty and MSAL’s `new URL(authority)` throws. | **Fix:** keep **`src/GoodApp.Client/wwwroot/appsettings.json`** and verify **`https://localhost:7077/appsettings.json`** returns JSON when the API host is running. Do not rely on an `appsettings.json` that is only beside the `.csproj` or only under `bin/`. |
 | Stuck on “Checking login state…” | MSAL redirect flow not completing; wrong or mismatched redirect URI; or stale browser storage. | Use **HTTPS** and the same origin as registered in Entra (for this repo: **7077** when using the API host). Register **SPA** redirect URIs, not “Web”. Clear site data / `msal` keys in **Application** storage after changing app registration. |
 | `Failed to bind ... 7077: address already in use` | A previous **GoodApp.Api** instance is still running. | Stop the old process (**Ctrl+C**) or `kill` the PID holding the port. |
 | `MSBUILD : error MSB1009: Project file does not exist` | `dotnet run --project` path was relative to the **wrong** working directory. | From repo root use `src/GoodApp.Api/GoodApp.Api.csproj`. From `src/GoodApp.Api` use `GoodApp.Api.csproj` or plain `dotnet run`. |
 | `AADSTS50011` (in URL or network response) | Redirect URI in the request does not match Entra registration. | Must match **exactly** (scheme, host, port, path). |
 
-Earlier experiments (since reverted or superseded) included: copying `AuthenticationService.js` into `wwwroot/js`, dynamic script loading and `Blazor.start()` ordering, `appsettings.Development.json` with absolute redirect URIs, extra MSAL cache flags, custom `Authentication.razor` fragments, and verbose auth logging. The **current** codebase is reduced to a small, template-like setup plus the **hosted** API project reference, which is the supported way to avoid the dev-server `_content` problem.
+Earlier experiments (since reverted or superseded) included: copying `AuthenticationService.js` into `wwwroot/js`, dynamic script loading and `Blazor.start()` ordering, and chasing redirect URI / `HostEnvironment.BaseAddress` in code while **`appsettings.json` was not under `wwwroot`** (the actual cause of **`Invalid URL`** from MSAL—see table above). The **current** codebase uses **`wwwroot/appsettings.json`** plus a small, template-like setup and the **hosted** API project reference, which is the supported way to avoid the dev-server `_content` problem.
 
 ---
 
