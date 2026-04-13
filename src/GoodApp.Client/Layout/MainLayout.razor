@@ -8,7 +8,7 @@
             <AuthorizeView>
                 <Authorized>
                     <NavLink href="/map" Match="NavLinkMatch.All">Map</NavLink>
-                    <a class="nav-link-out" href="/authentication/logout">Log out</a>
+                    <button type="button" class="nav-link-out" @onclick="BeginLogout">Log out</button>
                 </Authorized>
                 <NotAuthorized>
                     <NavLink href="/">Sign in</NavLink>
@@ -32,4 +32,7 @@
                 || path.StartsWith("map/", StringComparison.OrdinalIgnoreCase);
         }
     }
+
+    private void BeginLogout() =>
+        Navigation.NavigateToLogout("authentication/logout");
 }
