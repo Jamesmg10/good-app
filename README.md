@@ -149,6 +149,7 @@ Earlier experiments (since reverted or superseded) included: copying `Authentica
 - JWT validation on the API for protected endpoints; attach tokens via `AuthorizationMessageHandler` on `HttpClient`
 - PostgreSQL on Azure for opportunities and user data
 - Azure Static Web Apps + App Service, Front Door, Application Insights
+- **Map:** fix remaining map errors (Azure Maps control, `/api/maps/auth`, keys, or browser console issues) — track and resolve before treating the map experience as done.
 
 ### Authentication (follow-up)
 
