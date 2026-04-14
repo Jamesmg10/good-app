@@ -1,5 +1,8 @@
 @page "/map"
 
+@using System.Globalization
+@using System.Text.Json
+
 <PageTitle>Good — Map</PageTitle>
 
 <h1 class="map-page-title">Charitable opportunities near you</h1>
@@ -43,6 +46,75 @@
         </div>
 
         <div class="map-canvas-wrap">
+            <div class="map-top-stack">
+                <div class="map-search-shell" role="search">
+                    <label class="map-search-shell__label" for="map-area-search">Search by area</label>
+                    <div class="map-search-shell__field">
+                        <span class="map-search-shell__icon" aria-hidden="true">⌕</span>
+                        <input id="map-area-search"
+                               class="map-search-shell__input"
+                               type="search"
+                               autocomplete="off"
+                               placeholder="City, neighborhood, or address…"
+                               @bind="_searchQuery"
+                               @bind:event="oninput"
+                               @onkeydown="OnSearchKeyDownAsync"
+                               disabled="@(!_mapsReady || _searchBusy)" />
+                        <button type="button"
+                                class="map-search-shell__btn"
+                                disabled="@(!_mapsReady || _searchBusy)"
+                                @onclick="SearchAreaAsync">
+                            @if (_searchBusy)
+                            {
+                                <span>Searching…</span>
+                            }
+                            else
+                            {
+                                <span>Search</span>
+                            }
+                        </button>
+                    </div>
+                    @if (!string.IsNullOrEmpty(_searchFeedback))
+                    {
+                        <p class="map-search-shell__feedback" role="status">@_searchFeedback</p>
+                    }
+                </div>
+
+                @if (_showLocationPrompt && _mapsReady && string.IsNullOrEmpty(_error))
+                {
+                    <div class="map-location-prompt" role="region" aria-label="Share location">
+                        <p class="map-location-prompt__text">
+                            Share your location once to prioritize opportunities around you. You can change this anytime in the browser settings.
+                        </p>
+                        <div class="map-location-prompt__actions">
+                            <button type="button"
+                                    class="map-location-prompt__primary"
+                                    disabled="@_locationBusy"
+                                    @onclick="ShareLocationAsync">
+                                @if (_locationBusy)
+                                {
+                                    <span>Locating…</span>
+                                }
+                                else
+                                {
+                                    <span>Share location</span>
+                                }
+                            </button>
+                            <button type="button"
+                                    class="map-location-prompt__secondary"
+                                    disabled="@_locationBusy"
+                                    @onclick="DismissLocationPromptAsync">
+                                Not now
+                            </button>
+                        </div>
+                        @if (!string.IsNullOrEmpty(_locationPromptNote))
+                        {
+                            <p class="map-location-prompt__error" role="alert">@_locationPromptNote</p>
+                        }
+                    </div>
+                }
+            </div>
+
             @if (!string.IsNullOrEmpty(_error))
             {
                 <div class="map-overlay-alert alert" role="alert">@_error</div>
@@ -68,6 +140,13 @@
 @code {
     private const string MapContainerId = "good-map";
     private const string PlaceholderMapsKey = "YOUR_AZURE_MAPS_PRIMARY_KEY";
+    private const string LocationPromptSessionKey = "goodapp.map.locationPrompt";
+    private const double BboxHalfDegrees = 0.12;
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
 
     private static bool IsPlaceholderMapsKey(string key) =>
         string.Equals(key.Trim(), PlaceholderMapsKey, StringComparison.OrdinalIgnoreCase);
@@ -89,6 +168,13 @@
     private bool _loading = true;
     private bool _isAuthenticated;
     private bool _drawerOpen = false;
+    private bool _mapsReady;
+    private string _searchQuery = "";
+    private bool _searchBusy;
+    private string? _searchFeedback;
+    private bool _showLocationPrompt;
+    private bool _locationBusy;
+    private string? _locationPromptNote;
 
     protected override async Task OnInitializedAsync()
     {
@@ -127,32 +213,7 @@
 
         try
         {
-            var auth = await Http.GetFromJsonAsync<MapAuthResponse>("api/maps/auth");
-            if (auth is null || !string.IsNullOrEmpty(auth.Error) || string.IsNullOrEmpty(auth.SubscriptionKey))
-            {
-                _error = auth?.Error ?? "Could not load map authentication. Set AzureMaps:SubscriptionKey on the API (see README).";
-                _loading = false;
-                StateHasChanged();
-                return;
-            }
-
-            if (IsPlaceholderMapsKey(auth.SubscriptionKey))
-            {
-                _error = "Azure Maps key is still the placeholder. In src/GoodApp.Api run: dotnet user-secrets set \"AzureMaps:SubscriptionKey\" \"<your real Primary Key from Azure Portal>\"";
-                _loading = false;
-                StateHasChanged();
-                return;
-            }
-
-            _mapModule = await Js.InvokeAsync<IJSObjectReference>("import", "./js/azureMaps.js");
-            await _mapModule.InvokeVoidAsync("initMap", MapContainerId, auth.SubscriptionKey);
-
-            var opportunities = await Http.GetFromJsonAsync<List<OpportunityDto>>("api/opportunities") ?? [];
-            var json = System.Text.Json.JsonSerializer.Serialize(
-                opportunities,
-                new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
-            await _mapModule.InvokeVoidAsync("loadOpportunities", json);
-            await TryResizeMapAsync();
+            await InitMapAndDataAsync();
         }
         catch (HttpRequestException ex)
         {
@@ -167,5 +228,147 @@
             _loading = false;
             StateHasChanged();
         }
+    }
+
+    private async Task InitMapAndDataAsync()
+    {
+        var auth = await Http.GetFromJsonAsync<MapAuthResponse>("api/maps/auth");
+        if (auth is null || !string.IsNullOrEmpty(auth.Error) || string.IsNullOrEmpty(auth.SubscriptionKey))
+        {
+            _error = auth?.Error ?? "Could not load map authentication. Set AzureMaps:SubscriptionKey on the API (see README).";
+            return;
+        }
+
+        if (IsPlaceholderMapsKey(auth.SubscriptionKey))
+        {
+            _error = "Azure Maps key is still the placeholder. In src/GoodApp.Api run: dotnet user-secrets set \"AzureMaps:SubscriptionKey\" \"<your real Primary Key from Azure Portal>\"";
+            return;
+        }
+
+        _mapModule = await Js.InvokeAsync<IJSObjectReference>("import", "./js/azureMaps.js");
+        await _mapModule.InvokeVoidAsync("initMap", MapContainerId, auth.SubscriptionKey);
+
+        var opportunities = await Http.GetFromJsonAsync<List<OpportunityDto>>("api/opportunities") ?? [];
+        var json = JsonSerializer.Serialize(opportunities, JsonOptions);
+        await _mapModule.InvokeVoidAsync("loadOpportunities", json, null);
+
+        var dismissed = await Js.InvokeAsync<string?>("goodAppInterop.sessionGet", LocationPromptSessionKey);
+        _showLocationPrompt = dismissed is null;
+
+        _mapsReady = true;
+        await TryResizeMapAsync();
+    }
+
+    private static string OpportunitiesInAreaUrl(double lat, double lon)
+    {
+        double minLat = lat - BboxHalfDegrees;
+        double maxLat = lat + BboxHalfDegrees;
+        double minLon = lon - BboxHalfDegrees;
+        double maxLon = lon + BboxHalfDegrees;
+        return
+            "api/opportunities?minLat=" + minLat.ToString(CultureInfo.InvariantCulture)
+            + "&minLon=" + minLon.ToString(CultureInfo.InvariantCulture)
+            + "&maxLat=" + maxLat.ToString(CultureInfo.InvariantCulture)
+            + "&maxLon=" + maxLon.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private async Task LoadOpportunitiesNearAsync(double lat, double lon)
+    {
+        if (_mapModule is null)
+            return;
+
+        var url = OpportunitiesInAreaUrl(lat, lon);
+        var opportunities = await Http.GetFromJsonAsync<List<OpportunityDto>>(url) ?? [];
+        var json = JsonSerializer.Serialize(opportunities, JsonOptions);
+        await _mapModule.InvokeVoidAsync("loadOpportunities", json, new { center = new { lat, lon }, zoom = 12 });
+        _searchFeedback = opportunities.Count == 0
+            ? "No listings in this map area yet — try zooming out or searching another neighborhood."
+            : $"{opportunities.Count} opportunit{(opportunities.Count == 1 ? "y" : "ies")} in this area.";
+    }
+
+    private async Task SearchAreaAsync()
+    {
+        if (_mapModule is null || string.IsNullOrWhiteSpace(_searchQuery))
+            return;
+
+        _searchBusy = true;
+        _searchFeedback = null;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            var place = await _mapModule.InvokeAsync<GeoCoords>("geocodeAddress", _searchQuery.Trim());
+            await LoadOpportunitiesNearAsync(place.Lat, place.Lon);
+        }
+        catch (JSException ex)
+        {
+            _searchFeedback = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _searchFeedback = ex.Message;
+        }
+        finally
+        {
+            _searchBusy = false;
+            StateHasChanged();
+            await TryResizeMapAsync();
+        }
+    }
+
+    private async Task OnSearchKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (e.Key != "Enter")
+            return;
+        await SearchAreaAsync();
+    }
+
+    private async Task ShareLocationAsync()
+    {
+        if (_mapModule is null)
+            return;
+
+        _locationBusy = true;
+        _locationPromptNote = null;
+        StateHasChanged();
+
+        try
+        {
+            var loc = await _mapModule.InvokeAsync<GeoCoords>("getUserLocation");
+            await Js.InvokeVoidAsync("goodAppInterop.sessionSet", LocationPromptSessionKey, "done");
+            _showLocationPrompt = false;
+            await LoadOpportunitiesNearAsync(loc.Lat, loc.Lon);
+        }
+        catch (JSException ex)
+        {
+            _locationPromptNote = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _locationPromptNote = ex.Message;
+        }
+        finally
+        {
+            _locationBusy = false;
+            StateHasChanged();
+            await TryResizeMapAsync();
+        }
+    }
+
+    private async Task DismissLocationPromptAsync()
+    {
+        await Js.InvokeVoidAsync("goodAppInterop.sessionSet", LocationPromptSessionKey, "skipped");
+
+        _showLocationPrompt = false;
+        _locationPromptNote = null;
+        StateHasChanged();
+    }
+
+    private sealed class GeoCoords
+    {
+        public double Lat { get; set; }
+        public double Lon { get; set; }
+        public string? Label { get; set; }
     }
 }

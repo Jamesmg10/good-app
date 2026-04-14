@@ -25,6 +25,23 @@
     An error has occurred. <a href="" class="reload">Reload</a>
     <a class="dismiss">🗙</a>
   </div>
+  <!-- Session helpers on window: Blazor ES module import() does not reliably expose every export for InvokeAsync. -->
+  <script>
+    window.goodAppInterop = {
+      sessionGet: function (key) {
+        try {
+          return sessionStorage.getItem(key);
+        } catch {
+          return null;
+        }
+      },
+      sessionSet: function (key, value) {
+        try {
+          sessionStorage.setItem(key, value);
+        } catch { /* private mode */ }
+      }
+    };
+  </script>
   <script src="_content/Microsoft.Authentication.WebAssembly.Msal/AuthenticationService.js"></script>
   <script src="_framework/blazor.webassembly.js"></script>
 </body>

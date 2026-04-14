@@ -4,6 +4,8 @@ let bubbleLayer = null;
 /** @type {atlas.Popup | null} */
 let popup = null;
 let layerClickAttached = false;
+/** @type {string | null} */
+let subscriptionKey = null;
 
 function escapeHtml(s) {
   if (!s) return "";
@@ -69,9 +71,85 @@ function attachLayerClickOnce() {
 }
 
 /**
- * Initialize Azure Map and a BubbleLayer (WebGL) for opportunity points.
+ * Browser geolocation (user gesture recommended).
+ * @returns {Promise<{ lat: number; lon: number }>}
  */
-export function initMap(containerId, subscriptionKey) {
+function getUserLocation() {
+  return new Promise((resolve, reject) => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      reject(new Error("Geolocation is not supported in this browser."));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        resolve({
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude,
+        });
+      },
+      (err) => {
+        const msg =
+          err.code === 1
+            ? "Location permission was denied."
+            : err.code === 2
+              ? "Location is unavailable."
+              : err.code === 3
+                ? "Location request timed out."
+                : "Could not read your location.";
+        reject(new Error(msg));
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+    );
+  });
+}
+
+/**
+ * Azure Maps Search (address) — same subscription key as the map control.
+ * @returns {Promise<{ lat: number; lon: number; label: string }>}
+ */
+async function geocodeAddress(query) {
+  if (!subscriptionKey) {
+    throw new Error("Map is not ready yet.");
+  }
+  const trimmed = String(query ?? "").trim();
+  if (!trimmed) {
+    throw new Error("Enter a city, neighborhood, or address.");
+  }
+  const url =
+    "https://atlas.microsoft.com/search/address/json?api-version=1.0&subscription-key=" +
+    encodeURIComponent(subscriptionKey) +
+    "&query=" +
+    encodeURIComponent(trimmed) +
+    "&limit=1";
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error("Could not search that location. Try again.");
+  }
+  const data = await res.json();
+  const r = data.results && data.results[0];
+  if (!r || !r.position) {
+    throw new Error("No matches found. Try a different place name.");
+  }
+  return {
+    lat: r.position.lat,
+    lon: r.position.lon,
+    label: (r.address && r.address.freeformAddress) || trimmed,
+  };
+}
+
+function flyTo(lon, lat, zoom) {
+  if (!map) return;
+  const z = typeof zoom === "number" ? zoom : 12;
+  map.setCamera({
+    center: [lon, lat],
+    zoom: z,
+    type: "ease",
+    duration: 900,
+  });
+}
+
+function initMap(containerId, key) {
+  subscriptionKey = key;
   return new Promise((resolve, reject) => {
     if (typeof atlas === "undefined") {
       reject(new Error("Azure Maps SDK (atlas) is not loaded."));
@@ -81,7 +159,7 @@ export function initMap(containerId, subscriptionKey) {
     map = new atlas.Map(containerId, {
       authOptions: {
         authType: "subscriptionKey",
-        subscriptionKey: subscriptionKey,
+        subscriptionKey: key,
       },
       center: [-122.33, 47.61],
       zoom: 11,
@@ -141,7 +219,7 @@ export function initMap(containerId, subscriptionKey) {
   });
 }
 
-export function resizeMap() {
+function resizeMap() {
   if (!map) return;
   requestAnimationFrame(() => {
     try {
@@ -155,8 +233,9 @@ export function resizeMap() {
 /**
  * Load GeoJSON points into the data source and fit the camera.
  * @param {string} json — JSON array of opportunities (camelCase)
+ * @param { { center?: { lat: number; lon: number }; zoom?: number } | null } viewWhenEmpty — when there are no pins, move the map here
  */
-export function loadOpportunities(json) {
+function loadOpportunities(json, viewWhenEmpty) {
   if (!map || !dataSource) return;
 
   dataSource.clear();
@@ -183,12 +262,29 @@ export function loadOpportunities(json) {
     );
   }
 
-  if (positions.length === 0) return;
+  if (positions.length === 0) {
+    if (viewWhenEmpty && viewWhenEmpty.center) {
+      const c = viewWhenEmpty.center;
+      const lon = c.lon;
+      const lat = c.lat;
+      if (typeof lon === "number" && typeof lat === "number") {
+        map.setCamera({
+          center: [lon, lat],
+          zoom: typeof viewWhenEmpty.zoom === "number" ? viewWhenEmpty.zoom : 12,
+          type: "ease",
+          duration: 900,
+        });
+      }
+    }
+    return;
+  }
 
   if (positions.length === 1) {
     map.setCamera({
       center: positions[0],
       zoom: 14,
+      type: "ease",
+      duration: 600,
     });
     return;
   }
@@ -198,5 +294,17 @@ export function loadOpportunities(json) {
     bounds: bbox,
     padding: 56,
     maxZoom: 15,
+    type: "ease",
+    duration: 900,
   });
 }
+
+/** Default export for Blazor dynamic import(); map-related APIs only (session → index.html goodAppInterop). */
+export default {
+  getUserLocation,
+  geocodeAddress,
+  flyTo,
+  initMap,
+  resizeMap,
+  loadOpportunities,
+};
