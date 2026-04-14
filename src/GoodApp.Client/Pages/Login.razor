@@ -41,6 +41,24 @@
 
 @code {
     private const string PostLoginReturnPath = "/map";
+    private static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> DefaultProviderLoginQuery =
+        new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            // Blazor MSAL expects "domainHint" (camelCase). Some Entra flows also honor "idp".
+            ["Google"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["domainHint"] = "google.com",
+                ["idp"] = "Google",
+            },
+            ["Apple"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["domainHint"] = "apple.com",
+            },
+            ["Facebook"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["domainHint"] = "facebook.com",
+            },
+        };
 
     [CascadingParameter]
     private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
@@ -80,6 +98,12 @@
             Interaction = InteractionType.SignIn,
             ReturnUrl = PostLoginReturnPath,
         };
+
+        if (DefaultProviderLoginQuery.TryGetValue(providerKey, out var defaults))
+        {
+            foreach (var (key, value) in defaults)
+                options.TryAddAdditionalParameter(key, value);
+        }
 
         var section = Configuration.GetSection($"AzureAd:LoginQuery:{providerKey}");
         if (section.Exists())

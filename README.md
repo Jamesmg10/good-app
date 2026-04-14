@@ -51,6 +51,14 @@ Use the same scheme, host, and port in **`RedirectUri`** / **`PostLogoutRedirect
 
 To confirm the file is served, open **`https://localhost:7077/appsettings.json`** after starting the API; you should see JSON (without committing secrets you care about).
 
+#### Social sign-in (Google, Facebook, Apple)
+
+Workforce-only Entra (`login.microsoftonline.com/{tenant}`) does **not** expose Google/Facebook as first-class IdPs in the same way as **Microsoft Entra External Identities** user flows. To support **Continue with Google** (and similar) end-to-end, use a **customer** tenant with **External Identities** → identity providers and a **user flow**, assign your SPA app registration to that flow, and point `AzureAd:Authority` / `AzureAd:ClientId` at that tenant.
+
+The login page passes optional `InteractiveRequestOptions` extras via `AzureAd:LoginQuery` in `wwwroot/appsettings.json` (for example `domainHint` and `idp`). Values must match how your tenant names providers; if a button still routes to the Microsoft account screen, confirm the provider identifier in Entra and adjust `LoginQuery` accordingly.
+
+**Google Cloud Console (`redirect_uri_mismatch`):** When Google is federated through Entra, Google redirects to **Microsoft’s federation callback URL**, not `https://localhost:7077/...`. In **Google Cloud** → **Credentials** → your OAuth 2.0 client, add the **exact** redirect URI shown in **Entra → External Identities → All identity providers → Google** (copy/paste; no trailing slash mismatch). Do not list only the SPA localhost callback here—that URI is for Entra’s app registration, not for Google’s OAuth client in this flow.
+
 ### 3. Start the host
 
 From the **repository root** (`good-app`):
@@ -130,6 +138,7 @@ This section records issues seen during development so future debugging starts f
 | `Failed to bind ... 7077: address already in use` | A previous **GoodApp.Api** instance is still running. | Stop the old process (**Ctrl+C**) or `kill` the PID holding the port. |
 | `MSBUILD : error MSB1009: Project file does not exist` | `dotnet run --project` path was relative to the **wrong** working directory. | From repo root use `src/GoodApp.Api/GoodApp.Api.csproj`. From `src/GoodApp.Api` use `GoodApp.Api.csproj` or plain `dotnet run`. |
 | `AADSTS50011` (in URL or network response) | Redirect URI in the request does not match Entra registration. | Must match **exactly** (scheme, host, port, path). |
+| Google **Error 400: `redirect_uri_mismatch`** | The redirect URI sent to Google is not listed on the **Google Cloud** OAuth client used by Entra’s Google IdP. | Add the **Entra federation** redirect URI from the Google identity provider blade (not `localhost`). Use the same OAuth client ID/secret as configured in Entra. |
 
 Earlier experiments (since reverted or superseded) included: copying `AuthenticationService.js` into `wwwroot/js`, dynamic script loading and `Blazor.start()` ordering, and chasing redirect URI / `HostEnvironment.BaseAddress` in code while **`appsettings.json` was not under `wwwroot`** (the actual cause of **`Invalid URL`** from MSAL—see table above). The **current** codebase uses **`wwwroot/appsettings.json`** plus a small, template-like setup and the **hosted** API project reference, which is the supported way to avoid the dev-server `_content` problem.
 
@@ -140,3 +149,10 @@ Earlier experiments (since reverted or superseded) included: copying `Authentica
 - JWT validation on the API for protected endpoints; attach tokens via `AuthorizationMessageHandler` on `HttpClient`
 - PostgreSQL on Azure for opportunities and user data
 - Azure Static Web Apps + App Service, Front Door, Application Insights
+
+### Authentication (follow-up)
+
+- Confirm **`src/GoodApp.Client/wwwroot/appsettings.json`** uses the **Application (client) ID** and **Directory (tenant) ID** from the Entra app registration you intend (replace placeholders if you fork the repo).
+- For **Google** sign-in: finish **Google Cloud** OAuth client setup so **Authorized redirect URIs** include Entra’s federation URL from **External Identities → All identity providers → Google**; resolve any `redirect_uri_mismatch` before testing again.
+- For **Facebook** (and similar): add the provider in Entra, enable it on the same **user flow** as the SPA, and align `AzureAd:LoginQuery` if direct IdP routing is required.
+- Prefer a **dev** customer tenant and app registration for local testing; keep production values out of shared branches if your policy requires it.
